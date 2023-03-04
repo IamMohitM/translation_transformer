@@ -45,7 +45,7 @@ def load_dataset(
 
 
 if __name__ == "__main__":
-    train_dataset = load_dataset("Multi30k", "train", language_pair=["de", "en"])
+    train_dataset = load_dataset("Multi30k", "val", language_pair=["de", "en"])
     loader = DataLoader(train_dataset, batch_size=1)
 
     de_tokenizer = spacy.load("de_core_news_sm")
@@ -62,8 +62,8 @@ if __name__ == "__main__":
     print(len(english_texts))
 
     generate_and_save_tokens(
-        en_tokenizer, english_texts, "dataset/english_tokens.txt", 12000
+        en_tokenizer, english_texts, "dataset/val_english_tokens.txt", 12000
     )
     generate_and_save_tokens(
-        de_tokenizer, german_texts, "dataset/german_tokens.txt", 12000
+        de_tokenizer, german_texts, "dataset/val_german_tokens.txt", 12000
     )

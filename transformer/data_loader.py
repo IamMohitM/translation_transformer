@@ -78,6 +78,7 @@ def make_eng_german_dataloader(
     german_token_path,
     batch_size: int,
     device: torch.device,
+    split_type: str = "train",
 ) -> DataLoader:
     de_tokenizer = spacy.load("de_core_news_sm")
     en_tokenizer = spacy.load("en_core_web_sm")
@@ -91,7 +92,7 @@ def make_eng_german_dataloader(
     source_vocab = Vocab(de_tokenizer, german_tokens)
     target_vocab = Vocab(en_tokenizer, english_tokens)
 
-    dataset = load_dataset("Multi30k", "train", language_pair=["de", "en"])
+    dataset = load_dataset("Multi30k", split_type, language_pair=["de", "en"])
 
     def collate_fn(batch: List[Tuple[str, str]]):
         source_tokens_list = []
