@@ -13,17 +13,21 @@ def masked_softmax(X, valid_lens):  # @save
 
     # X: 3D tensor, valid_lens: 1D or 2D tensor
     def _sequence_mask(X, valid_len, value=0):
-        maxlen = X.size(1)
-        # broadcasting here
-        # first element will be 1 * maxlen
-        # second elemnt is len(valid_len) * 1
-        # mask will be len(valid_len) * maxlen
-        mask = (
-            
-            torch.arange((maxlen), dtype=torch.float32, device=X.device)[None, :]< valid_len[:, None]
-        )
-        # The mask describes which query and pair are
-        X[~mask] = value
+        # if same shape - apply directly
+        if X.shape == valid_lens.shape:
+            X[~valid_lens] = value
+        else:
+            maxlen = X.size(1)
+            # broadcasting here
+            # first element will be 1 * maxlen
+            # second elemnt is len(valid_len) * 1
+            # mask will be len(valid_len) * maxlen
+            mask = (
+                torch.arange((maxlen), dtype=torch.float32, device=X.device)[None, :]
+                < valid_len[:, None]
+            )
+            # The mask describes which query and pair are
+            X[~mask] = value
         return X
 
     if valid_lens is None:
@@ -36,18 +40,16 @@ def masked_softmax(X, valid_lens):  # @save
         elif valid_lens.dim() == 3:
             # if one mask for each batch
             if valid_lens.shape[1] == 1:
-                #(batch, 1, maxlen)
-                valid_lens = torch.sum(valid_lens, axis = 2).squeeze()
+                # (batch, 1, maxlen)
+                valid_lens = torch.sum(valid_lens, axis=2).squeeze()
         else:
             valid_lens = valid_lens.reshape(-1)
+
         # On the last axis, replace masked elements with a very large negative
         # value, whose exponentiation outputs 0
-        try:
-            #if same shape - apply directly
-            X[~valid_lens] = -1e6
-        except IndexError:
-            X = _sequence_mask(X, valid_lens, value=-1e6)
+        X = _sequence_mask(X, valid_lens, value=-1e6)
         return torch.nn.functional.softmax(X.reshape(shape), dim=-1)
+
 
 class AttentionHead(torch.nn.Module):
     """Implements one attention head
@@ -100,7 +102,9 @@ class MultiHeadAttention(torch.nn.Module):
     def __init__(self, num_heads, num_hidden, embed_dim, bias=False) -> None:
         super().__init__()
         self.num_heads = num_heads
-        self.attention_heads:torch.nn.ModuleList  = make_clones(AttentionHead, self.num_heads, num_hidden)
+        self.attention_heads: torch.nn.ModuleList = make_clones(
+            AttentionHead, self.num_heads, num_hidden
+        )
         # output must be same as embedding dimension size
         self.output = torch.nn.LazyLinear(embed_dim, bias)
 

@@ -5,6 +5,7 @@ Credits: https://nlp.seas.harvard.edu/2018/04/03/attention.html#decoder
 """
 
 import math
+import torch
 
 
 class NoamOpt:
@@ -16,10 +17,10 @@ class NoamOpt:
         optimizer,
         warmup=1000,
     ):
-        self.optimizer = optimizer
+        self.optimizer : torch.optim.Optimizer= optimizer
         self._step = 0
         self.warm_up_steps = warmup
-        self.embded_dim = embed_dim
+        self.embed_dim = embed_dim
         self._rate = 0
 
     def step(self):
@@ -29,6 +30,7 @@ class NoamOpt:
         for p in self.optimizer.param_groups:
             p["lr"] = rate
         self._rate = rate
+        self.optimizer.zero_grad()
         self.optimizer.step()
 
     def rate(self, step_num=None):

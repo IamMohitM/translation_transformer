@@ -3,21 +3,58 @@ from d2l import torch as d2l
 from transformer.encoder import Encoder, EncoderBlock
 from transformer.decoder import DecoderBlock, Decoder
 from transformer.transformer import EncoderDecoder
-from transformer.data_loader import make_eng_german_dataloader
+from transformer.data_loader import make_eng_german_dataloader, PAD_IDX
+from transformer.optimizer import NoamOpt
+
+from typing import Tuple
+
+
+def train_step(
+    model: torch.nn.Module,
+    data: Tuple,
+    loss_fn: torch.nn.CrossEntropyLoss,
+    optimizer: NoamOpt,
+    step: int
+):
+    print(f"Epoch Step - {step}")
+    source_batch, target_batch, label_batch, source_mask, target_mask = data
+    output = model(source_batch, target_batch, source_mask, target_mask)
+    loss = loss_fn(output.reshape(-1, output.shape[-1]), label_batch.reshape(-1))
+    loss.backward()
+    optimizer.step()
+    return loss.detach().cpu().item()
+
+
+def train_epoch(
+    model: torch.nn.Module,
+    dataloader,
+    optimizer: NoamOpt,
+    loss_fn: torch.nn.CrossEntropyLoss,
+    epoch_num: int,
+) -> torch.tensor:
+    print(f"Epoch {epoch_num}")
+    losses = []
+
+    for step, data in enumerate(dataloader):
+        loss = train_step(model, data, loss_fn, optimizer, step)
+        losses.append(loss)
+
+    print(f"Epoch {epoch_num} mean loss - {torch.mean(losses)}")
+    return losses
 
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_heads = 8
     embed_dim = 128
-    batch_size = 2
+    batch_size = 128
     ffn_num_hidden = 256
     total_words = 4
     num_hidden = 64  # dq = dk = dv = num_hiddens
     num_blocks = 2
     dropout = 0.1
-    data = d2l.MTFraEng(batch_size=2)
-    vocab_size = 12000
+    vocab_size = 12005
+    num_epochs = 500
 
     # Encoder ----
     # encoder = Encoder(
@@ -42,7 +79,7 @@ if __name__ == "__main__":
     ## -------
 
     ## Transformer --------
-    
+
     # encoder = Encoder(
     #     vocab_size=len(data.src_vocab),
     #     num_hidden=num_hidden,
@@ -77,22 +114,36 @@ if __name__ == "__main__":
     )
 
     model.to(device)
+    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=PAD_IDX)
+
+    adam = torch.optim.Adam(model.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
+    optimizer = NoamOpt(embed_dim=embed_dim, optimizer=adam)
     # ## Data definition
     # X = torch.randint(low=0, high=vocab_size, size=(3, total_words), device=device)
     german_tokens_path = "dataset/german_tokens.txt"
     english_tokens_path = "dataset/english_tokens.txt"
     dataloader = make_eng_german_dataloader(
-        english_tokens_path, german_tokens_path, 32, device
+        english_tokens_path, german_tokens_path, batch_size, device
     )
     # dataloader = make_eng_german_dataloader(
     #     dataset, source_vocab, target_vocab, 32, device
     # )
+    losses = []
 
-    for data in dataloader:
-        source_batch, target_batch, label_batch, source_mask, target_mask = data
+    for epoch in range(num_epochs):
+        epoch_loss = train_epoch(model, dataloader, optimizer, loss_fn, epoch)
+        losses.append(epoch_loss)
 
-        output = model(source_batch, target_batch, source_mask, target_mask)
-        print(output)
+    # for data in dataloader:
+    #     source_batch, target_batch, label_batch, source_mask, target_mask = data
+
+    #     output = model(source_batch, target_batch, source_mask, target_mask)
+    #     optimizer.step()
+    #     loss = loss_fn(output.reshape(-1, output.shape[-1]), label_batch.reshape(-1))
+    #     loss.backward()
+    #     losses.append(loss.detach().cpu().item())
+
+    # print(f"Mean - {torch.mean(losses)}")
 
     # output = model(source_batch, target_batch)
     # print(output)
