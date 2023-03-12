@@ -17,11 +17,14 @@ class NoamOpt:
         optimizer,
         warmup=1000,
     ):
-        self.optimizer : torch.optim.Optimizer= optimizer
+        self.optimizer: torch.optim.Optimizer = optimizer
         self._step = 0
         self.warm_up_steps = warmup
         self.embed_dim = embed_dim
         self._rate = 0
+
+    def zero_grad(self):
+        self.optimizer.zero_grad()
 
     def step(self):
         "Update parameters and rate"
@@ -30,7 +33,6 @@ class NoamOpt:
         for p in self.optimizer.param_groups:
             p["lr"] = rate
         self._rate = rate
-        self.optimizer.zero_grad()
         self.optimizer.step()
 
     def rate(self, step_num=None):

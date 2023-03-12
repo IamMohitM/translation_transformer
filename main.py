@@ -9,39 +9,6 @@ from transformer.optimizer import NoamOpt
 from typing import Tuple
 
 
-def train_step(
-    model: torch.nn.Module,
-    data: Tuple,
-    loss_fn: torch.nn.CrossEntropyLoss,
-    optimizer: NoamOpt,
-    step: int
-):
-    print(f"Epoch Step - {step}")
-    source_batch, target_batch, label_batch, source_mask, target_mask = data
-    output = model(source_batch, target_batch, source_mask, target_mask)
-    loss = loss_fn(output.reshape(-1, output.shape[-1]), label_batch.reshape(-1))
-    loss.backward()
-    optimizer.step()
-    return loss.detach().cpu().item()
-
-
-def train_epoch(
-    model: torch.nn.Module,
-    dataloader,
-    optimizer: NoamOpt,
-    loss_fn: torch.nn.CrossEntropyLoss,
-    epoch_num: int,
-) -> torch.tensor:
-    print(f"Epoch {epoch_num}")
-    losses = []
-
-    for step, data in enumerate(dataloader):
-        loss = train_step(model, data, loss_fn, optimizer, step)
-        losses.append(loss)
-
-    print(f"Epoch {epoch_num} mean loss - {torch.mean(losses)}")
-    return losses
-
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -130,20 +97,8 @@ if __name__ == "__main__":
     # )
     losses = []
 
-    for epoch in range(num_epochs):
-        epoch_loss = train_epoch(model, dataloader, optimizer, loss_fn, epoch)
-        losses.append(epoch_loss)
+    # for epoch in range(num_epochs):
+    #     epoch_loss = train_epoch(model, dataloader, optimizer, loss_fn, epoch)
+    #     losses.append(epoch_loss)
 
-    # for data in dataloader:
-    #     source_batch, target_batch, label_batch, source_mask, target_mask = data
-
-    #     output = model(source_batch, target_batch, source_mask, target_mask)
-    #     optimizer.step()
-    #     loss = loss_fn(output.reshape(-1, output.shape[-1]), label_batch.reshape(-1))
-    #     loss.backward()
-    #     losses.append(loss.detach().cpu().item())
-
-    # print(f"Mean - {torch.mean(losses)}")
-
-    # output = model(source_batch, target_batch)
-    # print(output)
+        
