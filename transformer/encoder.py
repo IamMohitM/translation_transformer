@@ -5,7 +5,8 @@ from .position_ffn import PositionWiseFFN
 from .residual_add_norm import AddNorm
 from .utils import make_clones
 from .position import PositionalEncoding
-from d2l import torch as d2l
+
+# from d2l import torch as d2l
 
 
 class EncoderBlock(torch.nn.Module):
@@ -32,8 +33,6 @@ class EncoderBlock(torch.nn.Module):
         self.add_norm_2 = AddNorm(embed_dim, dropout=dropout)
 
     def forward(self, x, valid_lens=None) -> torch.tensor:
-        # TODO: Need to divide x into queries, values and keys
-        # inefficient because too many new tensors
         sub_layer_1_output = self.add_norm_2(x, self.attention(x, x, x, valid_lens))
 
         return self.add_norm_2(
@@ -64,12 +63,12 @@ class Encoder(torch.nn.Module):
                 EncoderBlock(num_heads, num_hidden, embed_dim, ffn_hidden, dropout),
             )
 
-    def forward(self, X, valid_lens=None):
+    def forward(self, X: torch.tensor, valid_lens: torch.tensor = None):
         X = self.pos_encoding(self.embedding(X) * math.sqrt(self.embed_dim))
         self.attention_weights = [None] * len(self.blocks)
         for i, block in enumerate(self.blocks):
             X = block(X, valid_lens)
-            self.attention_weights[i] = torch.cat(  
+            self.attention_weights[i] = torch.cat(
                 [head.attention_weights for head in block.attention.attention_heads],
                 dim=0,
             )

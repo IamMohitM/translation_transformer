@@ -11,9 +11,10 @@ class EncoderDecoder(torch.nn.Module):
         ffn_hidden: int,
         num_heads: int,
         num_blocks: int,
+        source_vocab_size: int,
+        target_vocab_size: int,
         dropout: float = 0.1,
         max_length: int = 1000,
-        vocab_size: int = 1000,
     ) -> None:
         super().__init__()
         self.encoder: Encoder = Encoder(
@@ -21,13 +22,13 @@ class EncoderDecoder(torch.nn.Module):
             num_heads=num_heads,
             embed_dim=embed_dim,
             ffn_hidden=ffn_hidden,
-            vocab_size=vocab_size,
+            vocab_size=source_vocab_size,
             max_length=max_length,
             num_blocks=num_blocks,
             dropout=dropout,
         )
         self.decoder: Decoder = Decoder(
-            vocab_size=vocab_size,
+            vocab_size=target_vocab_size,
             num_heads=num_heads,
             num_hidden=num_hidden,
             embed_dim=embed_dim,

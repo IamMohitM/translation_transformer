@@ -30,19 +30,20 @@ class DecoderBlock(torch.nn.Module):
         self.ffn = PositionWiseFFN(ffn_hidden, embed_dim)
         self.add_norm_3 = AddNorm(embed_dim, dropout)
 
-    def forward(self, X, state, dec_valid_lens = None):
+    def forward(self, X, state, dec_valid_lens=None):
         # encoder inputs
         enc_outputs, enc_valid_lens = state[0], state[1]
 
         # num_steps is usually the maximum sequence length
         # We only edit index 2 of state because encoder inputs are same for all blocks
+        # TODO: check i index update
         if state[2][self.i] is None:
             key_values = X
         else:
             key_values = torch.cat((state[2][self.i], X), dim=1)
         state[2][self.i] = key_values
 
-        #get the mask for training
+        # get the mask for training
         # if self.training:
         #     batch_size, num_steps, _ = X.shape
         #     # Shape of dec_valid_lens: (batch_size, num_steps), where every
@@ -96,7 +97,7 @@ class Decoder(torch.nn.Module):
     def init_state(self, enc_outputs, enc_valid_lens):
         return [enc_outputs, enc_valid_lens, [None] * self.num_blocks]
 
-    def forward(self, X, state, decoder_valid_lens = None) -> Tuple:
+    def forward(self, X, state, decoder_valid_lens=None) -> Tuple:
         # Add position embeddings
         X = self.pos_encoding(self.embedding(X) * math.sqrt(self.embed_dim))
         # 2 because there are two attention layers in each block
