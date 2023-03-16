@@ -31,7 +31,7 @@ def load_tokenizer(language_key: str):
     return torchtext.data.get_tokenizer("spacy", language_key)
 
 
-def get_dataset_iter(split_type=["en"], language_pair=language_pair):
+def get_dataset_iter(split_type="train", language_pair=language_pair):
     return Multi30k(split=split_type, language_pair=language_pair)
 
 
@@ -59,10 +59,6 @@ def generate_subsequent_mask(size):
 
 
 def create_mask(source_sequence, target_sequence):
-    source_length = source_sequence.shape[0]
-    target_length = target_sequence.shape[0]
-    assert source_length == target_length
-
     source_pad_mask = (source_sequence != PAD_IDX).unsqueeze(1)
 
     target_pad_mask = (target_sequence != PAD_IDX).unsqueeze(1)
@@ -74,21 +70,6 @@ def create_mask(source_sequence, target_sequence):
     ).unsqueeze(0)
 
     return source_pad_mask, target_pad_mask & target_subsequence_mask
-
-    # source_mask = torch.zeros((source_length, source_length), device=device)
-
-    # # where source sequence is padded
-    # source_padding_mask = source_sequence == PAD_IDX
-
-    # # where target sequence is padded
-    # target_padding_mask = target_sequence == PAD_IDX
-
-    # return (
-    #     source_mask,
-    #     target_subsequence_mask,
-    #     source_padding_mask,
-    #     target_padding_mask,
-    # )
 
 
 def sequential_transformation(*transforms):
@@ -118,6 +99,8 @@ def prepare_dataloader(batch_size, split_type, source_vocab=None, target_vocab=N
     if source_vocab is None or target_vocab is None:
         source_vocab = build_vocab(source_tokenizer, dataset, source_language)
         target_vocab = build_vocab(target_tokenizer, dataset, target_language)
+        torch.save(source_vocab, "checkpoints/source_vocab.pth")
+        torch.save(target_vocab, "checkpoints/target_vocab.pth")
 
     source_transform = get_transforms(source_tokenizer, source_vocab)
     target_transform = get_transforms(target_tokenizer, target_vocab)

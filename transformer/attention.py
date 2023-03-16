@@ -14,8 +14,8 @@ def masked_softmax(X, valid_lens):  # @save
     # X: 3D tensor, valid_lens: 1D or 2D tensor
     def _sequence_mask(X, valid_len, value=0):
         # if same shape - apply directly
-        if X.shape == valid_lens.shape:
-            X[~valid_lens] = value
+        if X.shape == valid_len.shape:
+            X[~valid_len] = value
         else:
             maxlen = X.size(1)
             # broadcasting here
@@ -66,7 +66,6 @@ class AttentionHead(torch.nn.Module):
         self.w_q = torch.nn.LazyLinear(out_dim, bias=bias)
         self.w_k = torch.nn.LazyLinear(out_dim, bias=bias)
         self.w_v = torch.nn.LazyLinear(out_dim, bias=bias)
-        self.relu = torch.nn.ReLU()
         # TODO: Need to check where relu needs to be used
         # self.output = torch.nn.LazyLinear(512, bias=bias)
 
