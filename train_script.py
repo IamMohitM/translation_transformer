@@ -1,7 +1,7 @@
 import torch
 
 from transformer.transformer import EncoderDecoder
-from transformer.data_loader import make_eng_german_dataloader, PAD_IDX
+from transformer.data_loader import PAD_IDX
 from transformer.optimizer import NoamOpt
 from torch.utils.tensorboard import SummaryWriter
 
@@ -56,14 +56,12 @@ def get_model(
     ).to(device)
 
 
-def get_dataloader(english_tokens_path, german_tokens_path, split_type, batch_size):
-    return make_eng_german_dataloader(
-        english_tokens_path,
-        german_tokens_path,
-        batch_size,
-        device,
-        split_type=split_type,
-    )
+def translate_batch(source, truth, target):
+    preds = torch.argmax(target, dim=-1).tolist()
+    source_tokens = source_vocab.lookup_tokens(source.tolist())
+    truth_tokens = target_vocab.lookup_tokens(truth.tolist())
+    target_tokens = target_vocab.lookup_tokens(preds)
+    return source_tokens, truth_tokens, target_tokens
 
 
 def predict(model, data):
@@ -80,10 +78,10 @@ def train_step(
 ):
     global global_steps
     print(f"Epoch Step - {step}")
-    output, label_batch = predict(model, data)
-    loss = loss_fn(output.reshape(-1, output.shape[-1]), label_batch.reshape(-1))
-
     optimizer.zero_grad()
+    output, label_batch = predict(model, data)
+    # print(translate_batch(data[0][0], output[0]))
+    loss = loss_fn(output.reshape(-1, output.shape[-1]), label_batch.reshape(-1))
     loss.backward()
     optimizer.step()
     global_steps += 1
@@ -100,8 +98,8 @@ def train_epoch(
     print(f"Epoch {epoch_num}")
     losses = []
     global global_steps
-    for step, data in enumerate(dataloader):
-        loss = train_step(model, data, loss_fn, optimizer, step)
+    for batch_num, batch_sample in enumerate(dataloader):
+        loss = train_step(model, batch_sample, loss_fn, optimizer, batch_num)
         writer.add_scalar("Train Step Loss", loss, global_steps)
         losses.append(loss)
 
@@ -156,6 +154,7 @@ def train(
         mean_epoch_loss = torch.tensor(epoch_losses).mean()
         writer.add_scalar("Epoch Mean Loss", mean_epoch_loss, epoch)
         training_losses.append(mean_epoch_loss)
+
         model.eval()
         mean_val_loss = evaluate(model, validation_dataloader)
         writer.add_scalar("Validation Mean Loss", mean_val_loss, epoch)
@@ -172,19 +171,26 @@ if __name__ == "__main__":
     # params
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_heads = 8
-    embed_dim = 128
+
+    embed_dim = 512
     batch_size = 128
-    ffn_num_hidden = 256
+    # decreasgin ffn_num_hiden to decrease overfitting possibilities
+    ffn_num_hidden = 512
     num_hidden = 64  # dq = dk = dv = num_hiddens
-    num_blocks = 2
+    # decreasing num_blocks
+    num_blocks = 6
     dropout = 0.1
-    num_epochs = 500
+    num_epochs = 100
 
-    train_dataloader, source_vocab, target_vocab = prepare_dataloader(
-        batch_size=batch_size, split_type="train"
-    )
+    (
+        train_dataloader,
+        source_vocab,
+        target_vocab,
+        source_tokenizer,
+        target_tokenizer,
+    ) = prepare_dataloader(batch_size=batch_size, split_type="train")
 
-    val_dataloader, _, _ = prepare_dataloader(
+    val_dataloader, _, _, _, _ = prepare_dataloader(
         batch_size=batch_size,
         split_type="valid",
         source_vocab=source_vocab,
@@ -206,16 +212,6 @@ if __name__ == "__main__":
         target_vocab_size,
     )
 
-    # train_dataloader = get_dataloader(
-    #     english_tokens_path, german_tokens_path, "train", batch_size
-    # )
-    # val_dataloader = get_dataloader(
-    #     english_tokens_path, german_tokens_path, "valid", batch_size
-    # )
-    # test_dataloader = get_dataloader(
-    #     english_tokens_path, german_tokens_path, "test", batch_size
-    # )
-
     model.to(device)
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=PAD_IDX)
 
@@ -223,10 +219,14 @@ if __name__ == "__main__":
     optimizer = NoamOpt(embed_dim=embed_dim, optimizer=adam)
     # ## Data definition
     # X = torch.randint(low=0, high=vocab_size, size=(3, total_words), device=device)
-    german_tokens_path = "dataset/german_tokens.txt"
-    english_tokens_path = "dataset/english_tokens.txt"
-    dataloader = make_eng_german_dataloader(
-        english_tokens_path, german_tokens_path, batch_size, device
+    train_dataloader, source_vocab, target_vocab, _, _ = prepare_dataloader(
+        batch_size=batch_size, split_type="train"
+    )
+    val_dataloader, source_vocab, target_vocab, _, _ = prepare_dataloader(
+        batch_size=batch_size,
+        split_type="valid",
+        source_vocab=source_vocab,
+        target_vocab=target_vocab,
     )
 
     losses = []
