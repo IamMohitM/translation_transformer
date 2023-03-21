@@ -88,7 +88,7 @@ class AttentionHead(torch.nn.Module):
         scores = torch.bmm(Query, Key.transpose(1, 2)) / math.sqrt(dim)
         # attention weights are multiplied to the values
         self.attention_weights = masked_softmax(scores, valid_lens)
-        return torch.matmul(self.attention_weights, Value)
+        return torch.bmm(self.attention_weights, Value)
 
 
 class MultiHeadAttention(torch.nn.Module):

@@ -4,6 +4,7 @@ from torchtext.datasets import multi30k, Multi30k
 from .data_conf import UNK_IDX, PAD_IDX, SOS_IDX, EOS_IDX, special_tokens, device
 from torchtext.vocab import build_vocab_from_iterator
 from torch.nn.utils.rnn import pad_sequence
+from torchtext.data.utils import get_tokenizer
 
 from torch.utils.data import DataLoader
 
@@ -25,10 +26,12 @@ source_language = "de"
 target_language = "en"
 language_pair = (source_language, target_language)
 language_index = {source_language: 0, target_language: 1}
+language_dataset = {"de": "de_core_news_sm", "en": "en_core_web_sm"}
+language_file = {"en": "dataset/en_samples.txt", "de": "dataset/de_samples.txt"}
 
 
 def load_tokenizer(language_key: str):
-    return torchtext.data.get_tokenizer("spacy", language_key)
+    return torchtext.data.get_tokenizer("spacy", language_dataset[language_key])
 
 
 def get_dataset_iter(split_type="train", language_pair=language_pair):
@@ -38,12 +41,25 @@ def get_dataset_iter(split_type="train", language_pair=language_pair):
 def build_vocab(tokenizer, data_iter, language):
     # tokenizer = load_tokenizer(language)
 
-    def data_iterator(data_iter, language):
+    def data_iterator(language):
+        with open(language_file[language], "r") as f:
+            data_iter = f.readlines()
+
         for sample in data_iter:
-            yield tokenizer(sample[language_index[language]])
+            yield tokenizer(sample.strip())
+
+    # def data_iterator(data_iter, language):
+    #     # file = open(f"dataset/{language}_samples.txt", "w")
+
+    #     for sample in data_iter:
+    #         sentence = sample[language_index[language]]
+    #         # file.write(f"{sentence}\n")
+    #         yield tokenizer(sentence)
+
+    # file.close()
 
     vocab = build_vocab_from_iterator(
-        data_iterator(data_iter, language),
+        data_iterator(language),
         specials=special_tokens.values(),
         special_first=True,
         min_freq=1,
@@ -134,8 +150,14 @@ def prepare_dataloader(batch_size, split_type, source_vocab=None, target_vocab=N
         # move everything to the target device
         return [x.to(device) for x in all_batches]
 
+    #! Wierdly using num_workers 4 (or anything > 1) imakes the dataloader repeat the batch over multiple iterations
+    #! Some child DataPipes are not exhausted when __iter__ is called.
     return (
-        DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn),
+        DataLoader(
+            dataset, batch_size=batch_size, collate_fn=collate_fn
+        ),
         source_vocab,
         target_vocab,
+        source_tokenizer,
+        target_tokenizer,
     )

@@ -55,7 +55,7 @@ class Encoder(torch.nn.Module):
         super().__init__()
         self.embed_dim = embed_dim
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dim=embed_dim)
-        self.pos_encoding = PositionalEncoding(embed_dim=embed_dim, max_len=max_length)
+        self.pos_encoding = PositionalEncoding(embed_dim=embed_dim, max_len=max_length, dropout=dropout)
         self.blocks = torch.nn.Sequential()
         for i in range(num_blocks):
             self.blocks.add_module(

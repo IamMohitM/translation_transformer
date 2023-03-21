@@ -36,10 +36,10 @@ class DecoderBlock(torch.nn.Module):
 
         # num_steps is usually the maximum sequence length
         # We only edit index 2 of state because encoder inputs are same for all blocks
-        # TODO: check i index update
         if state[2][self.i] is None:
             key_values = X
         else:
+            #? this should be invoked during prediction
             key_values = torch.cat((state[2][self.i], X), dim=1)
         state[2][self.i] = key_values
 
@@ -55,7 +55,7 @@ class DecoderBlock(torch.nn.Module):
         #     dec_valid_lens = None
 
         # masked Self-attention
-        X2 = self.masked_multihead_attention(X, key_values, key_values, dec_valid_lens)
+        X2 = self.masked_multihead_attention(X, X, X, dec_valid_lens)
         Y = self.add_norm_1(X, X2)
         # Encoder-decoder attention. Shape of enc_outputs:
         # (batch_size, num_steps, embed_dim)
@@ -83,7 +83,9 @@ class Decoder(torch.nn.Module):
         self.num_blocks = num_blocks
         self.embed_dim = embed_dim
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dim=embed_dim)
-        self.pos_encoding = PositionalEncoding(embed_dim=embed_dim, max_len=max_length)
+        self.pos_encoding = PositionalEncoding(
+            embed_dim=embed_dim, max_len=max_length, dropout=dropout
+        )
         self.decoder_sub = torch.nn.Sequential()
         for i in range(self.num_blocks):
             self.decoder_sub.add_module(

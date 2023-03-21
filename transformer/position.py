@@ -4,7 +4,7 @@ import torch
 class PositionalEncoding(torch.nn.Module):
     def __init__(self, embed_dim, dropout=0, max_len=1000) -> None:
         super().__init__()
-        self.dropout = torch.nn.Dropout()
+        self.dropout = torch.nn.Dropout(dropout)
 
         self.P = torch.zeros((1, max_len, embed_dim))
         X = torch.arange(max_len, dtype=torch.float32).reshape(-1, 1) / torch.pow(
