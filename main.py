@@ -14,7 +14,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_heads = 8
     embed_dim = 128
-    batch_size = 128
+    batch_size = 2
     ffn_num_hidden = 256
     total_words = 4
     num_hidden = 64  # dq = dk = dv = num_hiddens
@@ -95,10 +95,15 @@ if __name__ == "__main__":
     # dataloader = make_eng_german_dataloader(
     #     dataset, source_vocab, target_vocab, 32, device
     # )
-    losses = []
+
+    for data in dataloader:
+        source_batch, target_batch, label_batch, source_mask, target_mask = data
+        output = model(source_batch, target_batch, source_mask, target_mask)
+        print(output.shape)
+        break
 
     # for epoch in range(num_epochs):
-    #     epoch_loss = train_epoch(model, dataloader, optimizer, loss_fn, epoch)
+        # epoch_loss = train_epoch(model, dataloader, optimizer, loss_fn, epoch)
     #     losses.append(epoch_loss)
 
         

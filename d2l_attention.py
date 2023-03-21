@@ -6,13 +6,17 @@ import torch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def masked_softmax(X, valid_lens):  #@save
+
+def masked_softmax(X, valid_lens):  # @save
     """Perform softmax operation by masking elements on the last axis."""
+
     # X: 3D tensor, valid_lens: 1D or 2D tensor
     def _sequence_mask(X, valid_len, value=0):
         maxlen = X.size(1)
-        mask = torch.arange((maxlen), dtype=torch.float32,
-                            device=X.device)[None, :] < valid_len[:, None]
+        mask = (
+            torch.arange((maxlen), dtype=torch.float32, device=X.device)[None, :]
+            < valid_len[:, None]
+        )
         X[~mask] = value
         return X
 
@@ -28,9 +32,11 @@ def masked_softmax(X, valid_lens):  #@save
         # value, whose exponentiation outputs 0
         X = _sequence_mask(X.reshape(-1, shape[-1]), valid_lens, value=-1e6)
         return nn.functional.softmax(X.reshape(shape), dim=-1)
-    
-class DotProductAttention(nn.Module):  #@save
+
+
+class DotProductAttention(nn.Module):  # @save
     """Scaled dot product attention."""
+
     def __init__(self, dropout):
         super().__init__()
         self.dropout = nn.Dropout(dropout)
@@ -45,12 +51,19 @@ class DotProductAttention(nn.Module):  #@save
         scores = torch.bmm(queries, keys.transpose(1, 2)) / math.sqrt(d)
         self.attention_weights = masked_softmax(scores, valid_lens)
         return torch.bmm(self.dropout(self.attention_weights), values)
-    
+
 
 class MultiHeadAttention(d2l.Module):  # @save
     """Multi-head attention."""
 
-    def __init__(self, num_hiddens, num_heads, dropout, bias=False, **kwargs):
+    def __init__(
+        self,
+        num_hiddens: int,
+        num_heads: int,
+        dropout: int,
+        bias: bool = False,
+        **kwargs
+    ):
         super().__init__()
         self.num_heads = num_heads
         # self.attention = d2l.DotProductAttention(dropout)
@@ -60,7 +73,13 @@ class MultiHeadAttention(d2l.Module):  # @save
         self.W_v = nn.LazyLinear(num_hiddens, bias=bias)
         self.W_o = nn.LazyLinear(num_hiddens, bias=bias)
 
-    def forward(self, queries, keys, values, valid_lens):
+    def forward(
+        self,
+        queries: torch.tensor,
+        keys: torch.tensor,
+        values: torch.tensor,
+        valid_lens: torch.tensor,
+    ):
         # Shape of queries, keys, or values:
         # (batch_size, no. of queries or key-value pairs, num_hiddens)
         # Shape of valid_lens: (batch_size,) or (batch_size, no. of queries)
@@ -109,9 +128,6 @@ def transpose_output(self, X):
     return X.reshape(X.shape[0], X.shape[1], -1)
 
 
-
-
-
 if __name__ == "__main__":
     # embedding = torch.rand((3, 1, 128), device="cuda")
     # embedding_batch_size, dim = embedding.shape[0], embedding.shape[-1]
@@ -124,7 +140,7 @@ if __name__ == "__main__":
     # # output = attention_head(emb)
     # print(output.shape)
 
-    # num_hiddens, num_heads = 64, 4  
+    # num_hiddens, num_heads = 64, 4
     # attention = MultiHeadAttention(num_hiddens, num_heads, 0.5)
     # attention.to(device)
     # batch_size, num_queries, num_kvpairs = 2, 4, 6
@@ -137,5 +153,5 @@ if __name__ == "__main__":
 
     # encoder = d2l.TransformerEncoder(200, 24, 48, 8, 2, 0.5)
     encoder = d2l.TransformerEncoder(200, 10, 48, 8, 2, 0.5)
-    output = encoder(torch.ones((2, 20), dtype=torch.long), valid_lens = None)
+    output = encoder(torch.ones((2, 20), dtype=torch.long), valid_lens=None)
     d2l.check_shape(output, (2, 100, 24), (2, 100, 24))
