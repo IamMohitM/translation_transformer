@@ -1,6 +1,5 @@
 import torch
 import math
-import copy
 
 from .utils import make_clones
 
@@ -26,7 +25,7 @@ def masked_softmax(X, valid_lens):  # @save
                 torch.arange((maxlen), dtype=torch.float32, device=X.device)[None, :]
                 < valid_len[:, None]
             )
-            # The mask describes which query and pair are
+            # The mask describes which query and pair are invalid
             X[~mask] = value
         return X
 
@@ -36,6 +35,7 @@ def masked_softmax(X, valid_lens):  # @save
         # TODO: optimize masking
         shape = X.shape
         if valid_lens.dim() == 1:
+            # repeat them for each token in X
             valid_lens = torch.repeat_interleave(valid_lens, shape[1])
         elif valid_lens.dim() == 3:
             # if one mask for each batch
@@ -85,10 +85,102 @@ class AttentionHead(torch.nn.Module):
         # Key shape - (batch, num_kv_pairs, dim) - changed to (batch, dim, num_kv_paris) - each dim size descibes each key
         # scores (batch, num_queries, num_kv_pairs) - describes score for each query to all 6 keys
         # the bottom performs a dot product between each query and each key - highest value means the query and key are similar
-        scores = torch.bmm(Query, Key.transpose(1, 2)) / math.sqrt(dim)
+        scores = torch.bmm(Query, Key.transpose(-2, -1)) / math.sqrt(dim)
         # attention weights are multiplied to the values
         self.attention_weights = masked_softmax(scores, valid_lens)
         return torch.bmm(self.attention_weights, Value)
+
+
+class DotProductAttention(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+
+    @staticmethod
+    def masked_softmax(X, valid_lens):
+        # X shape is 3D (batch, tokens, token)
+        def sequence_mask(X, valid_len, value=-1e6):
+            if X.shape == valid_len.shape:
+                X[~valid_len] == value
+            else:
+                # torch.arange()
+                maxlen = X.shape[1]
+                mask = (
+                    torch.arange((maxlen), dtype=torch.float32, device=X.device)[
+                        None, :
+                    ]
+                    < valid_len[:, None]
+                )
+                X[~mask] = value
+            return X
+
+        if not valid_lens is None:
+            # valid_lens can be 1D, 2D, 3D
+            # if 1D, then each value represents max value for a batch
+            if valid_lens.dim() == 1:
+                ...
+            X = sequence_mask(X, valid_lens, -1e6)
+
+        return torch.nn.functional.softmax(X, dim=-1)
+
+    def forward(self, queries, keys, values, valid_lens=None):
+        dim = queries.size(-1)
+        # queries - keys - values - (batch, tokens, projected_dims)
+        scores = torch.bmm(queries, torch.transpose(keys, 1, 2)) / math.sqrt(dim)
+        # scores - batch, tokens, tokens
+        # valid lens - None
+        # valid lens - 1D
+        self.attention_weights = DotProductAttention.masked_softmax(scores, valid_lens)
+
+        # result - (batch, tokens, tokens) * (batch, token, projected_dims) -> (b, t, projected_dims)
+        return torch.bmm(self.attention_weights, values)
+
+
+class MultiHeadAttentionParrallel(torch.nn.Module):
+    def __init__(self, num_heads, embed_dim, dropout=0.2, bias=False) -> None:
+        super().__init__()
+        self.num_heads = num_heads
+
+        # if num_hiddens is None or num_hiddens % num_heads != 0:
+        #     num_hiddens = embed_dim
+        assert (
+            embed_dim % num_heads == 0
+        ), f"embed_dim ({embed_dim}) must be divisible by num_heads ({num_heads})"
+        self.attention = DotProductAttention()
+
+        self.W_q = torch.nn.LazyLinear(embed_dim, bias)
+        self.W_k = torch.nn.LazyLinear(embed_dim, bias)
+        self.W_v = torch.nn.LazyLinear(embed_dim, bias)
+        self.dropout = torch.nn.Dropout(dropout)
+
+        self.output_linear = torch.nn.LazyLinear(embed_dim, bias)
+
+    def transpose_qkv(self, X):
+        # heads divided
+        # input - (batch, tokens, dims) - output - (batch, tokens, heads, dim/heads)
+        X = X.reshape(X.shape[0], X.shape[1], self.num_heads, -1)
+        # (batch, heads, tokens, dim/heads)
+        X = X.permute(0, 2, 1, 3)
+
+        # (batch * heads, tokens, dim/heads)
+        return X.reshape(-1, X.shape[-2], X.shape[-1])
+
+    def transpose_output(self, X):
+        # reverse of transpose_qkv
+        # input (batch * heads, tokens, dim/heads) -> (batch, heads, tokens, dim/heads)
+        X = X.reshape(-1, self.num_heads, X.shape[1], X.shape[2])
+        # (batch, tokens, heads, dim/heads)
+        X = X.permute(0, 2, 1, 3)
+        # (batch, tokens, dim)
+        return X.reshape(X.shape[0], X.shape[1], -1)
+
+    def forward(self, queries, keys, values, valid_lens=None):
+        Queries = self.transpose_qkv(self.W_q(queries))
+        Keys = self.transpose_qkv(self.W_k(keys))
+        Values = self.transpose_qkv(self.W_v(values))
+
+        attention_output = self.attention(Queries, Keys, Values, valid_lens)
+
+        return self.dropout(self.output_linear(self.transpose_output(attention_output)))
 
 
 class MultiHeadAttention(torch.nn.Module):

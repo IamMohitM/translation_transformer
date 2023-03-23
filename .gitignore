@@ -1,6 +1,8 @@
-venv/
+*venv/
 *__pycache__*
 .vscode/
 
 tensorboard_logs
 checkpoints/
+
+dataset/fmnist
