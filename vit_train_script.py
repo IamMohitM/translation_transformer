@@ -2,42 +2,88 @@ from torchvision.datasets import FashionMNIST
 from torchvision import transforms
 import torch
 from torch.utils.data import DataLoader
+import wandb
+
+torch.manual_seed(50)
 
 from transformer.vision_transformer import ViT, ViTSequential
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+wandb.init(project="ViT")
 
 
 class Trainer:
-    def __init__(self, optimizer: torch.optim.Optimizer) -> None:
+    def __init__(
+        self, optimizer: torch.optim.Optimizer, checkpoint_path="checkpoints/model.pth"
+    ) -> None:
         self.optimizer = optimizer
-        pass
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.val_acc = float("-inf")
+        self.checkpoint_path = checkpoint_path
 
     def predict(self, model, *args):
         return model(*args)
-        ...
 
     def train(
         self, model, train_dataloader, val_dataloader, loss_fn, optimizer, epochs
     ):
-        # for batch_input, batch_labels in train_dataloader:
-        # loss_value =
+        wandb.watch(model, loss_fn, log='all', log_freq = 10)
+        model.to(self.device)
+        for epoch_num in range(epochs):
+            print(f"Epoch {epoch_num}")
+            for batch_input, batch_labels in train_dataloader:
+                batch_input, batch_labels = batch_input.to(
+                    self.device
+                ), batch_labels.to(self.device)
+                loss_value = self.training_step(
+                    model, loss_fn, batch_labels, batch_input
+                )
 
-        ...
+                wandb.log({"training_loss": loss_value})
+            self.evaluate(model, val_dataloader)
 
     def training_step(self, model, loss_fn, labels, *args):
         output = self.predict(model, *args)
-        labels = ...
         loss = loss_fn(output, labels)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
         return loss.detach().cpu().item()
-        ...
 
-    def evaluate():
-        ...
+    def save_model(self, model : torch.nn.Module):
+        print(f"Saving model to {self.checkpoint_path}")
+        torch.save({"state_dict": model.state_dict()}, self.checkpoint_path)
+
+    def evaluate(self, model, dataloader):
+        model.eval()
+        correct = 0
+        total = 0
+        labels_list = []
+        predictions_list = []
+        for images, labels in dataloader:
+            images, labels = images.to(device), labels.to(device)
+            labels_list.append(labels)
+
+            # test = Variable(images.view(100, 1, 28, 28))
+
+            outputs = model(images)
+
+            predictions = torch.max(outputs, 1)[1].to(device)
+            predictions_list.append(predictions)
+            correct += (predictions == labels).sum()
+
+            total += len(labels)
+
+        accuracy = correct / total
+        print(f"Val Accuracy: {accuracy}")
+        wandb.log({"val_accuracy": accuracy})
+        if accuracy > self.val_acc:
+            # wandb.log_artifact(model)
+            self.val_acc = accuracy
+            self.save_model(model)
+            torch.onnx.export(model, images, "model.onnx")
+            wandb.save("model.onnx")
 
 
 img_size = 56
@@ -131,6 +177,18 @@ def train(model, train_dataloader, val_dataloader, loss_fn, optimizer, num_epoch
 
 
 if __name__ == "__main__":
+    config = {
+        "patch_size": 8,
+        "embed_dim": 512,
+        "mlp_num_hidden": 1024,
+        "num_heads": 16,
+        "num_blocks": 8,
+        "emb_dropout": 0.1,
+        "block_dropout": 0.1,
+        "use_bias": True,
+        "img_size": img_size,
+    }
+
     patch_size = 8
     embed_dim = 512
     mlp_num_hidden = 1024
@@ -140,8 +198,10 @@ if __name__ == "__main__":
     block_dropout = 0.1
     use_bias = True
 
+    vit = ViT(**config)
 
-    # vit = ViT(
+    wandb.config = config
+    # vit = ViTSequential(
     #     img_size=img_size,
     #     patch_size=patch_size,
     #     embed_size=embed_dim,
@@ -152,22 +212,17 @@ if __name__ == "__main__":
     #     block_dropout=block_dropout,
     # )
 
-    vit = ViTSequential(
-            img_size=img_size,
-            patch_size=patch_size,
-            embed_size=embed_dim,
-            mlp_num_hiddens=mlp_num_hidden,
-            num_heads=num_heads,
-            num_blocks=num_blocks,
-            emb_dropout=emb_dropout,
-            block_dropout=block_dropout,
-        )
-
     loss_fn = torch.nn.CrossEntropyLoss()
-    train(
-        vit,
-        train_dataloader,
-        val_dataloader,
-        loss_fn,
-        optimizer=torch.optim.Adam(vit.parameters(), lr=0.0001, ),
+    optimizer = torch.optim.Adam(
+        vit.parameters(),
+        lr=0.0001,
     )
+    trainer = Trainer(optimizer=optimizer)
+    trainer.train(vit, train_dataloader, val_dataloader, loss_fn, optimizer, epochs=100)
+    # train(
+    #     vit,
+    #     train_dataloader,
+    #     val_dataloader,
+    #     loss_fn,
+    #     optimizer=optimizer
+    # )
