@@ -1,6 +1,6 @@
 import math
 import torch
-from .attention import MultiHeadAttention
+from .attention import MultiHeadAttentionParrallel
 from .position_ffn import PositionWiseFFN
 from .residual_add_norm import AddNorm
 from .utils import make_clones
@@ -23,8 +23,8 @@ class EncoderBlock(torch.nn.Module):
         dropout: float = 0.5,
     ) -> None:
         super().__init__()
-        self.attention = MultiHeadAttention(
-            num_heads=num_heads, num_hidden=num_hidden, embed_dim=embed_dim
+        self.attention = MultiHeadAttentionParrallel(
+            num_heads=num_heads, embed_dim=embed_dim
         )
         self.position_ffn = PositionWiseFFN(
             ffn_num_hidden=ffn_hidden, ffn_num_output=embed_dim
@@ -68,11 +68,12 @@ class Encoder(torch.nn.Module):
         self.attention_weights = [None] * len(self.blocks)
         for i, block in enumerate(self.blocks):
             X = block(X, valid_lens)
-            self.attention_weights[i] = torch.cat(
-                [head.attention_weights for head in block.attention.attention_heads],
-                dim=0,
-            )
+            # self.attention_weights[i] = torch.cat(
+            #     [head.attention_weights for head in block.attention.attention_heads],
+            #     dim=0,
+            # )
         return X
+    
 
 
 if __name__ == "__main__":

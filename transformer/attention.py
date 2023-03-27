@@ -147,12 +147,12 @@ class MultiHeadAttentionParrallel(torch.nn.Module):
         ), f"embed_dim ({embed_dim}) must be divisible by num_heads ({num_heads})"
         self.attention = DotProductAttention()
 
-        self.W_q = torch.nn.LazyLinear(embed_dim, bias)
-        self.W_k = torch.nn.LazyLinear(embed_dim, bias)
-        self.W_v = torch.nn.LazyLinear(embed_dim, bias)
+        self.W_q = torch.nn.Linear(embed_dim, embed_dim, bias)
+        self.W_k = torch.nn.Linear(embed_dim, embed_dim, bias)
+        self.W_v = torch.nn.Linear(embed_dim, embed_dim, bias)
         self.dropout = torch.nn.Dropout(dropout)
 
-        self.output_linear = torch.nn.LazyLinear(embed_dim, bias)
+        self.output_linear = torch.nn.Linear(embed_dim, embed_dim, bias)
 
     def transpose_qkv(self, X):
         # heads divided

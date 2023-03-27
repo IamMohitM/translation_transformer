@@ -24,6 +24,7 @@ class ViTBlock(torch.nn.Module):
         )
         self.ln2 = torch.nn.LayerNorm(norm_shape)
         self.mlp = ViTMLP(
+            embed_dim=embed_dim,
             mlp_num_hiddens=mlp_num_hiddens, mlp_num_outputs=embed_dim, dropout=dropout
         )
 
