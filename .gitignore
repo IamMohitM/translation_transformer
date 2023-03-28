@@ -5,8 +5,17 @@
 wandb/
 tensorboard_logs
 checkpoints/
+temp/
 
 dataset/fmnist
 
 *.onnx
 *.out
+tutorial.ipynb
+tutorial.py
+test*.png
+test*.jpg
+dataset/test_english_tokens.txt
+dataset/test_german_tokens.txt
+dataset/valid_english_tokens.txt
+dataset/valid_german_tokens.txt
