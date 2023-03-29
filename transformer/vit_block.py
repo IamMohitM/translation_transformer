@@ -11,14 +11,20 @@ class ViTBlock(torch.nn.Module):
         mlp_num_hiddens,
         num_heads,
         dropout,
+        qkv_transform_dim = None,
         use_bias=False,
     ) -> None:
         super().__init__()
 
         self.ln1 = torch.nn.LayerNorm(norm_shape)
+
+        if qkv_transform_dim is None:
+            qkv_transform_dim = embed_dim
+
         self.attention = MultiHeadAttentionParrallel(
             num_heads=num_heads,
             embed_dim=embed_dim,
+            qkv_transform_dim=qkv_transform_dim,
             bias=use_bias,
             dropout=dropout
         )

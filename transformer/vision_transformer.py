@@ -14,13 +14,15 @@ class ViT(torch.nn.Module):
         num_blocks,
         emb_dropout,
         block_dropout,
+        qkv_transform_dim = None,
+        image_channels = 1,
         use_bias=False,
         num_classes=10,
         **kwargs,
     ) -> None:
         super().__init__()
         self.patch_embedding = PatchEmbedding(
-            img_size, patch_size, num_hiddens=embed_dim
+            img_size, patch_size, num_hiddens=embed_dim, in_channels = image_channels
         )
         self.class_token = torch.nn.Parameter(torch.zeros(1, 1, embed_dim))
 
@@ -31,6 +33,10 @@ class ViT(torch.nn.Module):
 
         self.dropout = torch.nn.Dropout(emb_dropout)
         self.blocks = torch.nn.Sequential()
+
+        if qkv_transform_dim is None:
+            qkv_transform_dim = embed_dim
+
         for block in range(num_blocks):
             self.blocks.add_module(
                 f"Block {block}",
@@ -38,6 +44,7 @@ class ViT(torch.nn.Module):
                     embed_dim=embed_dim,
                     norm_shape=embed_dim,
                     mlp_num_hiddens=mlp_num_hidden,
+                    qkv_transform_dim = qkv_transform_dim,
                     num_heads=num_heads,
                     dropout=block_dropout,
                     use_bias=use_bias,

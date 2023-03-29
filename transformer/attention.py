@@ -136,23 +136,28 @@ class DotProductAttention(torch.nn.Module):
 
 
 class MultiHeadAttentionParrallel(torch.nn.Module):
-    def __init__(self, num_heads, embed_dim, dropout=0.2, bias=False) -> None:
+    def __init__(self, num_heads, embed_dim, qkv_transform_dim = None, dropout=0.2, bias=False) -> None:
         super().__init__()
         self.num_heads = num_heads
 
         # if num_hiddens is None or num_hiddens % num_heads != 0:
         #     num_hiddens = embed_dim
+
+        if qkv_transform_dim is None:
+            qkv_transform_dim = embed_dim
+
         assert (
-            embed_dim % num_heads == 0
-        ), f"embed_dim ({embed_dim}) must be divisible by num_heads ({num_heads})"
+            qkv_transform_dim % num_heads == 0
+        ), f"qkv_transform_dim ({qkv_transform_dim}) must be divisible by num_heads ({num_heads})"
+
         self.attention = DotProductAttention()
 
-        self.W_q = torch.nn.Linear(embed_dim, embed_dim, bias)
-        self.W_k = torch.nn.Linear(embed_dim, embed_dim, bias)
-        self.W_v = torch.nn.Linear(embed_dim, embed_dim, bias)
+        self.W_q = torch.nn.Linear(embed_dim, qkv_transform_dim, bias)
+        self.W_k = torch.nn.Linear(embed_dim, qkv_transform_dim, bias)
+        self.W_v = torch.nn.Linear(embed_dim, qkv_transform_dim, bias)
         self.dropout = torch.nn.Dropout(dropout)
 
-        self.output_linear = torch.nn.Linear(embed_dim, embed_dim, bias)
+        self.output_linear = torch.nn.Linear(qkv_transform_dim, embed_dim, bias)
 
     def transpose_qkv(self, X):
         # heads divided
