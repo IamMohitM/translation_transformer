@@ -53,7 +53,7 @@ class DotProductAttention(nn.Module):  # @save
         return torch.bmm(self.dropout(self.attention_weights), values)
 
 
-class MultiHeadAttention(d2l.Module):  # @save
+class MultiHeadAttention(torch.nn.Module):  # @save
     """Multi-head attention."""
 
     def __init__(
@@ -72,6 +72,25 @@ class MultiHeadAttention(d2l.Module):  # @save
         self.W_k = nn.LazyLinear(num_hiddens, bias=bias)
         self.W_v = nn.LazyLinear(num_hiddens, bias=bias)
         self.W_o = nn.LazyLinear(num_hiddens, bias=bias)
+
+    def transpose_qkv(self, X):
+        """Transposition for parallel computation of multiple attention heads."""
+        # Shape of input X: (batch_size, no. of queries or key-value pairs,
+        # num_hiddens). Shape of output X: (batch_size, no. of queries or
+        # key-value pairs, num_heads, num_hiddens / num_heads)
+        X = X.reshape(X.shape[0], X.shape[1], self.num_heads, -1)
+        # Shape of output X: (batch_size, num_heads, no. of queries or key-value
+        # pairs, num_hiddens / num_heads)
+        X = X.permute(0, 2, 1, 3)
+        # Shape of output: (batch_size * num_heads, no. of queries or key-value
+        # pairs, num_hiddens / num_heads)
+        return X.reshape(-1, X.shape[2], X.shape[3])
+
+    def transpose_output(self, X):
+        """Reverse the operation of transpose_qkv."""
+        X = X.reshape(-1, self.num_heads, X.shape[1], X.shape[2])
+        X = X.permute(0, 2, 1, 3)
+        return X.reshape(X.shape[0], X.shape[1], -1)
 
     def forward(
         self,
@@ -105,53 +124,8 @@ class MultiHeadAttention(d2l.Module):  # @save
         return self.W_o(output_concat)
 
 
-@d2l.add_to_class(MultiHeadAttention)  # @save
-def transpose_qkv(self, X):
-    """Transposition for parallel computation of multiple attention heads."""
-    # Shape of input X: (batch_size, no. of queries or key-value pairs,
-    # num_hiddens). Shape of output X: (batch_size, no. of queries or
-    # key-value pairs, num_heads, num_hiddens / num_heads)
-    X = X.reshape(X.shape[0], X.shape[1], self.num_heads, -1)
-    # Shape of output X: (batch_size, num_heads, no. of queries or key-value
-    # pairs, num_hiddens / num_heads)
-    X = X.permute(0, 2, 1, 3)
-    # Shape of output: (batch_size * num_heads, no. of queries or key-value
-    # pairs, num_hiddens / num_heads)
-    return X.reshape(-1, X.shape[2], X.shape[3])
-
-
-@d2l.add_to_class(MultiHeadAttention)  # @save
-def transpose_output(self, X):
-    """Reverse the operation of transpose_qkv."""
-    X = X.reshape(-1, self.num_heads, X.shape[1], X.shape[2])
-    X = X.permute(0, 2, 1, 3)
-    return X.reshape(X.shape[0], X.shape[1], -1)
-
-
 if __name__ == "__main__":
-    # embedding = torch.rand((3, 1, 128), device="cuda")
-    # embedding_batch_size, dim = embedding.shape[0], embedding.shape[-1]
-    # query_input, key_input, value_input = embedding.repeat(
-    #     embedding_batch_size, 1, 1
-    # ).reshape(embedding.shape[0], 3, embedding.shape[-1])
-    # model = MultiHeadAttention(64, 8, 0.5).to(device)
-    # output = model(query_input, key_input, value_input, valid_lens = [128, 128, 128])
-    # # attention_head = AttentionHead(False)
-    # # output = attention_head(emb)
-    # print(output.shape)
-
-    # num_hiddens, num_heads = 64, 4
-    # attention = MultiHeadAttention(num_hiddens, num_heads, 0.5)
-    # attention.to(device)
-    # batch_size, num_queries, num_kvpairs = 2, 4, 6
-    # valid_lens = torch.tensor([3, 2], device = device)
-    # X = torch.ones((batch_size, num_queries, 10), device= device)
-    # Y = torch.ones((batch_size, num_kvpairs, 10), device = device)
-    # output = (attention(X, Y, Y, valid_lens))
-    # d2l.check_shape(output,
-    #                 (batch_size, num_queries, num_hiddens))
-
-    # encoder = d2l.TransformerEncoder(200, 24, 48, 8, 2, 0.5)
+    
     encoder = d2l.TransformerEncoder(200, 10, 48, 8, 2, 0.5)
     output = encoder(torch.ones((2, 20), dtype=torch.long), valid_lens=None)
     d2l.check_shape(output, (2, 100, 24), (2, 100, 24))
